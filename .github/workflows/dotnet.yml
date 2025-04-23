@@ -70,3 +70,34 @@ jobs:
       with:
           name: published-app
           path: ./publish
+
+  deploy-to-iis:
+    needs: build
+    runs-on: self-hosted
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: published-app
+          path: ./publish
+
+      - name: Stop IIS site
+        run: |
+          Import-Module WebAdministration
+          Stop-WebAppPool -Name "DefaultAppPool"
+          Write-Output "Esperando 5 segundos para liberar recursos..."
+          Start-Sleep -Seconds 5          
+        shell: powershell
+
+      - name: Deploy to IIS (using PowerShell copy)
+        run: |
+          $source = "$(pwd)\publish"
+          $destination = "C:\app"
+          Copy-Item -Path $source\* -Destination $destination -Recurse -Force
+        shell: powershell
+
+      - name: Start IIS site
+        run: |
+          Import-Module WebAdministration
+          Start-WebAppPool -Name "DefaultAppPool"
+        shell: powershell
