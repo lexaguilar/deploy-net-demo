@@ -1,0 +1,114 @@
+# This workflow will build a .NET project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net
+
+name: .NET
+
+on:
+  push:
+    branches: [ "develop" ]
+  pull_request:
+    branches: [ "develop" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Scan for vulnerable packages
+      run: dotnet list package --vulnerable
+
+    - name: Build
+      run: dotnet build --no-restore
+    - name: Test
+      run: dotnet test --no-build --verbosity normal
+
+    - name: Scan for secrets
+      uses: gitleaks/gitleaks-action@v2
+      env:
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+      with:
+        args: "--verbose --redact"
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: 17
+        distribution: 'temurin'  # Distribución recomendada para Linux
+
+    - name: Install SonarScanner for .NET
+      run: |
+        dotnet tool install --global dotnet-sonarscanner
+
+    - name: Run SonarCloud Analysis
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Necesario para PRs
+      run: |
+        dotnet sonarscanner begin \
+          /k:"lexaguilar_demo-tareas" \
+          /o:"lexaguilar" \
+          /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
+          /d:sonar.host.url="https://sonarcloud.io" \
+          /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml"  # Opcional para cobertura
+
+        dotnet build
+        dotnet sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+
+    - name: Publish Artifacts
+      run: dotnet publish -c Release -o ./publish -p:Version=1.0.0.${{ github.run_number }} -p:AssemblyVersion=1.0.0.${{ github.run_number }} -p:FileVersion=1.0.0.${{ github.run_number }} -p:InformationalVersion=1.0.0.${{ github.run_number }}
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+          name: published-app
+          path: ./publish
+
+#   deploy-to-iis:
+#     needs: build
+#     runs-on: self-hosted
+#     steps:
+#       - name: Download artifacts
+#         uses: actions/download-artifact@v4
+#         with:
+#           name: published-app
+#           path: ./publish
+
+#       - name: Stop IIS site
+#         run: |
+#           Import-Module WebAdministration
+#           Stop-WebAppPool -Name "DefaultAppPool"
+#           Write-Output "Esperando 5 segundos para liberar recursos..."
+#           Start-Sleep -Seconds 5          
+#         shell: powershell
+
+#       - name: Deploy to IIS (using PowerShell copy)
+#         run: |
+#           $source = "$(pwd)\publish"
+#           $destination = "C:\app"
+#           Copy-Item -Path $source\* -Destination $destination -Recurse -Force
+#         shell: powershell
+
+#       - name: Start IIS site
+#         run: |
+#           Import-Module WebAdministration
+#           Start-WebAppPool -Name "DefaultAppPool"
+#         shell: powershell
+
+#       - name: Publish SNS Topic
+#         uses: nothingalike/sns-publish-topic@v1.6
+#         with:
+#           MESSAGE: "Despliegue exitoso para el repositorio ${{ github.repository }} en la rama ${{ github.ref }}"
+#           SUBJECT: "Nueva Publicación realizada con éxito"
+#           TOPIC_ARN: "arn:aws:sns:us-east-1:462415074685:notificacion-app"
+#         env:
+#           AWS_REGION: "us-east-1"
+#           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
