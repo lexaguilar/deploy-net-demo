@@ -61,4 +61,4 @@ jobs:
           /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml"  # Opcional para cobertura
 
         dotnet build
-	      dotnet sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+        dotnet sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
