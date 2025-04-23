@@ -54,7 +54,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Necesario para PRs
       run: |
         dotnet sonarscanner begin \
-          /k:"lexaguilar_taskmanagerapi" \
+          /k:"lexaguilar_demo-tareas" \
           /o:"lexaguilar" \
           /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
           /d:sonar.host.url="https://sonarcloud.io" \
